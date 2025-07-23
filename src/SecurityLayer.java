@@ -31,8 +31,9 @@ public class SecurityLayer {
             "43DB5BFCE0FD108E4B82D120A93AD2CAFFFFFFFFFFFFFFFF";
 
     private final BigInteger primeNumber = new BigInteger(hexPrime,16); // prime number
-    private final short generator = 2; // primitive root
+    private final short generator = 2; // primitive root -- magic number kinda bad
     private BigInteger clientPrivateKey; // your private key youre going to create your public key with
+    private BigInteger clientPublicKey; // your public key aswell
     public BigInteger sharedSecretKey; // the final key that will be used for encryption
     private final String preSharedKey ="d36a6190d328e9d8d6960cd9fc377648282723d304444fa75f711a75aa169689";
     private final Mac Hmac ;
@@ -75,7 +76,11 @@ public class SecurityLayer {
         this.clientPrivateKey = new BigInteger(256,rand); // generate a 256bit integer.
     }
     public BigInteger createClientPublicKey(){ // 2 Creates public key to be shared to other peer
-        return BigInteger.valueOf(generator).modPow(this.clientPrivateKey,primeNumber);
+        this.clientPublicKey = BigInteger.valueOf(generator).modPow(this.clientPrivateKey,primeNumber);
+        return this.clientPublicKey;
+    }
+    public BigInteger getClientPublicKey(){
+        return this.clientPublicKey;
     }
     public void createSharedSecret(BigInteger otherPublicKey){ // 3
         this.sharedSecretKey = otherPublicKey.modPow(this.clientPrivateKey,primeNumber);

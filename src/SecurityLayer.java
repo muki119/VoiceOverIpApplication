@@ -1,12 +1,10 @@
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.math.BigInteger;
-import java.nio.Buffer;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.util.Arrays;
-import java.util.Random;
+
 
 public class SecurityLayer {
     //shared static secret key for authentication
@@ -35,7 +33,7 @@ public class SecurityLayer {
     private BigInteger clientPrivateKey; // your private key youre going to create your public key with
     private BigInteger clientPublicKey; // your public key aswell
     public BigInteger sharedSecretKey; // the final key that will be used for encryption
-    private final String preSharedKey ="d36a6190d328e9d8d6960cd9fc377648282723d304444fa75f711a75aa169689";
+    private final String preSharedKey ="d36a6190d328e9d8d6960cd9fc377648282723d304444fa75f711a75aa169689"; // need to turn into hex before turning into bytes
     private final Mac Hmac ;
 
 
@@ -82,8 +80,8 @@ public class SecurityLayer {
     public BigInteger getClientPublicKey(){
         return this.clientPublicKey;
     }
-    public void createSharedSecret(BigInteger otherPublicKey){ // 3
-        this.sharedSecretKey = otherPublicKey.modPow(this.clientPrivateKey,primeNumber);
+    public void createSharedSecret(BigInteger peerPublicKey){ // 3
+        this.sharedSecretKey = peerPublicKey.modPow(this.clientPrivateKey,primeNumber);
         this.xorEncryptionKey = this.sharedSecretKey.toByteArray();
     }
     public boolean hasSharedSecretKey(){

@@ -11,6 +11,10 @@ public class App {
     private int port; // for reconnect purposes
     private int portToBind = 0;
     private int defaultPort = 2556;
+    private AudioRecorder audioRecorder = null;
+    private AudioPlayer audioPlayer = null;
+
+    private Thread audioRecorderThread = null; // thread for the recording loop
     // have a graceful shutdown
 
     App(int portToBindTo) {
@@ -25,8 +29,29 @@ public class App {
     public void Shutdown(){
         System.out.println("App is shutting down");
         if (appConnection != null){
+            if (audioRecorderThread != null){
+                audioRecorderThread.interrupt();
+                try {
+                    audioRecorderThread.join(500); // Wait up to 500 millisecond
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
             appConnection.close();
         }
+        closeAudio();
+
+    }
+
+    private void closeAudio(){
+        if (audioPlayer != null){
+            audioPlayer.close();
+        }
+        if (audioRecorder != null){
+            audioRecorder.close();
+        }
+        audioPlayer = null;
+        audioRecorder = null;
     }
 
     public int getPortToBind (){
@@ -41,8 +66,24 @@ public class App {
         if(portToBind == 0){ // if the user never specified a port to bind
             portToBind = defaultPort; // bind to 2556 (default port)
         }
+        closeAudio();
          // start a new call as an initiator
-        appConnection = new newConnection(ip, port, getPortToBind());
+        if (audioRecorderThread != null && audioRecorderThread.isAlive()) {
+            audioRecorderThread.interrupt();
+            try {
+                audioRecorderThread.join(1000); // Wait up to 1 second
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        
+        if (this.appConnection != null) {
+            System.out.println("Closing existing connection before starting a new one.");
+            appConnection.close();
+        }
+        appConnection = null;
+        appConnection = new newConnection(ip, port); // try to connect to the peer
         this.ip = ip;
         this.port = port;
         run();
@@ -53,35 +94,48 @@ public class App {
 
     public void run(){
         try{
-            AudioRecorder audioRecorder = new AudioRecorder();
-            AudioPlayer audioPlayer = new AudioPlayer();
-            appConnection.listen((data)->{
+            audioRecorder = new AudioRecorder();
+            audioPlayer = new AudioPlayer();
+            // Capture connection reference to prevent race conditions
+            final newConnection currentConnection = appConnection;
+            currentConnection.listen((data)->{
                 try{
                     audioPlayer.playBlock(data);
                 } catch (IOException e) {
-                    System.out.println(e);
+                    System.out.println("Audio playback error: " + e);
                 }
             });
-            new Thread(()->{
-                while(appConnection.isListening() && !muted.get()){
-                    //record audio block and send it on sendEncrypted(bytes)
-                    //String text = new Scanner(System.in).nextLine()+'\n';
-                    try {
-                        appConnection.sendEncrypted(audioRecorder.getBlock()); // main thread blocking
-                    } catch (IOException e) {
-                        System.out.println(e);
+
+            audioRecorderThread = new Thread(()-> {
+                try {
+                    while (currentConnection.isConnected()) {
+                        if (Thread.currentThread().isInterrupted()) {
+                            System.out.println("Audio recorder thread interrupted, stopping.");
+                            break; // Exit the loop if the thread is interrupted
+                        }
+                        if (!muted.get()) { // if not muted
+                            byte[] audioData = audioRecorder.getBlock();
+                            System.out.println("sending audio");
+                            if (audioData != null) {
+                                currentConnection.sendAudio(audioData); // send the recorded audio data
+                            }
+                        } else {
+                            Thread.sleep(100); // sleep for a short time to avoid busy waiting
+                        }
                     }
-    //            System.out.println(Arrays.toString(bs));
-    //            System.out.println(Arrays.toString(text.getBytes()));
-    //            System.out.println(Arrays.toString(testConnection.testDecrypt(bs)));
+                } catch (Exception e) {
+                    System.out.println("Audio recorder thread error: " + e);
+                } finally {
+                    System.out.println("Audio recorder thread stopped");
                 }
-            });
+            }, "AudioRecorderThread");
 
+            audioRecorderThread.start();
 
-        }catch (Exception e ){
-            System.out.println(e);
+        } catch (Exception e) {
+            System.out.println("Error in run(): " + e);
+            e.printStackTrace();
         }
-
     }
 
     public void toggleMute(){
@@ -90,19 +144,13 @@ public class App {
     public boolean isMuted(){
         return muted.get();
     }
-    public boolean isListening(){
+    public boolean isConnected(){
         if (appConnection != null){
-            return appConnection.isListening();
+            return appConnection.isConnected();
         }
         return false;
     }
 
-    public void newConnection(){
-        if (appConnection != null){
-            appConnection.close();
-        }
-        appConnection = new newConnection(getPortToBind());
-    }
 
 
 

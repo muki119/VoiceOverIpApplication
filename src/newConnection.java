@@ -45,7 +45,7 @@ public class newConnection {
             // responderMode(); // start the responder mode
         } catch (Exception e) {
             System.out.println("(Responder Mode) Error creating newConnection: " + e.getMessage());
-            e.printStackTrace();
+            close();
             return; // no need to continue if we can't create the socket
         }
         // will begin listening on running
@@ -65,6 +65,7 @@ public class newConnection {
             modeThread.start(); // start the initiator mode thread
         } catch (Exception e) {
             System.out.println("(Initiator Mode) Error creating newConnection: " + e.getMessage());
+            close();
             return; // no need to continue if we can't create the socket
         }
         // will bind to any socket and will initiate the calls
@@ -281,6 +282,10 @@ public class newConnection {
             System.out.println("Flag cannot be 0, please use a valid flag.");
             return; // return if flag is 0
         }
+        if (isClosed.get()){
+            System.out.println("Connection is closed, cannot send data.");
+            return; // return if connection is closed
+        }
         if (peerAddress == null){
             System.out.println("Peer address is not set, cannot send data.");
             return; // return if peer address is not set
@@ -334,6 +339,12 @@ public class newConnection {
             System.out.println("Flag cannot be 0, please use a valid flag.");
             return null; // return null if flag is 0
         }
+
+        if (isClosed.get()){
+            System.out.println("Connection is closed, cannot receive data.");
+            return null; // return null if connection is closed
+        }
+
         try {
             ByteBuffer incomingDataBuffer = ByteBuffer.allocate(1024);
             DatagramPacket dataPacket = new DatagramPacket(incomingDataBuffer.array(), incomingDataBuffer.capacity());
@@ -341,7 +352,7 @@ public class newConnection {
             this.socket.receive(dataPacket);
             byte[] authenticatedData = authenticatePacket(dataPacket.getData(), dataPacket.getLength());
             if (authenticatedData == null) {
-                System.out.println("Authentication failed for received data: " + Arrays.toString(dataPacket.getData()));
+                //System.out.println("Authentication failed for received data: " + Arrays.toString(dataPacket.getData()));
                 return null; // return null if authentication fails
             }
 
@@ -356,7 +367,7 @@ public class newConnection {
                 return data; // return the data
             }
             else {
-                System.out.println("Received data with incorrect flag: " + Arrays.toString(authenticatedData));
+                //System.out.println("Received data with incorrect flag: " + Arrays.toString(authenticatedData));
                 return null; // return null if the flag does not match
             }
         }catch (SocketTimeoutException e) {
@@ -382,9 +393,10 @@ public class newConnection {
     private byte[] receiveEncrypted(){
         try {
             byte[] encryptedData = receiveData(DataFlags.DATA.value);
+            if (encryptedData == null) return null;
             return securityLayer.decrypt(encryptedData); // will decrypt the data using the security layer
         } catch (SocketTimeoutException e) {
-            System.out.println("receiveEncrypted: Timeout while waiting for data.");
+            //System.out.println("receiveEncrypted: Timeout while waiting for data.");
         } catch (Exception e) {
             System.out.println("receiveEncrypted: Error while receiving data.");
             e.printStackTrace();
@@ -396,6 +408,10 @@ public class newConnection {
 
     public void close(){
         try{
+            if (this.isClosed.get()) {
+                System.out.println("Connection is already closed.");
+                return; // return if connection is already closed
+            }
             if (this.listenerThread != null && this.listenerThread.isAlive()) {
                 this.listenerThread.interrupt(); // interrupt the listener thread if it is alive
                 listenerThread.join(2000);
@@ -404,12 +420,14 @@ public class newConnection {
                 this.modeThread.interrupt(); // interrupt the mode thread if it is alive
                 modeThread.join(2000);
             }
+
             this.socket.close(); // close the socket
             this.isConnected.set(false); // set connected to false
             this.isListening.set(false); // set listening to false
+            this.isClosed.set(true); // set closed to true
             System.out.println("Connection closed.");
         } catch (InterruptedException e) {
-                System.out.println("Error while closing threads: " + e.getMessage());
+            System.out.println("Error while closing threads: " + e.getMessage());
         }
         // closes listening thread
         // closes socket

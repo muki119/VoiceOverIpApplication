@@ -115,7 +115,7 @@ public class App {
                         }
                         if (!muted.get()) { // if not muted
                             byte[] audioData = audioRecorder.getBlock();
-                            System.out.println("sending audio");
+                            //System.out.println("sending audio");
                             if (audioData != null) {
                                 currentConnection.sendAudio(audioData); // send the recorded audio data
                             }

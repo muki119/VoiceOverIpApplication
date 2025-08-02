@@ -53,13 +53,13 @@ git clone --branch VoipImplementation2 https://github.com/muki119/VoiceOverIpApp
 ```
 
 
-# To Compile. 
+### Compile the program. 
 ```bash 
 cd VoiceOverIpApplication 
 javac -cp ./src/AudioLib.jar ./src/*.java -d ./out 
 ```
 
-# To Run. 
+### Run the program. 
 By default, the program will run on port 2556.
 However, you do have the option to select a port to listen to.
 
@@ -68,7 +68,7 @@ cd VoiceOverIpApplication
 java -cp out:./src/AudioLib.jar Main [Port]
 ```
 
-# To Initiate 
+### Calling a peer. 
 **When the program starts, the application will begin listening for incoming connections on the specified or default port** .
 ```text
 Welcome to VoIPCLi 
